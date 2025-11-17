@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Block Blast — Modo Infinito</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#0b1220;
+      --tile-size:48px;
+      --cols:10;
+      --rows:12;
+      --gap:6px;
+      --font: "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:var(--font);
+      background:linear-gradient(180deg,#071028 0%, var(--bg) 100%);
+      color:#e6eef8;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+    .container{
+      width: calc(var(--cols) * var(--tile-size) + (var(--cols)-1)*var(--gap) + 220px);
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.08));
+      border-radius:12px;
+      padding:18px;
+      display:flex;
+      gap:18px;
+      box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+    }
+
+    .board {
+      background:var(--panel);
+      padding:16px;
+      border-radius:10px;
+      display:grid;
+      grid-template-columns: repeat(var(--cols), var(--tile-size));
+      grid-template-rows: repeat(var(--rows), var(--tile-size));
+      gap:var(--gap);
+    }
+
+    .tile {
+      width:var(--tile-size);
+      height:var(--tile-size);
+      border-radius:8px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      user-select:none;
+      transition: transform .12s ease, opacity .18s ease;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.35), inset 0 -6px 10px rgba(255,255,255,0.02);
+    }
+
+    .tile.removing {
+      transform: scale(.3) rotate(10deg);
+      opacity:0;
+    }
+
+    .panel {
+      width:200px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      align-items:flex-start;
+    }
+
+    h1{font-size:18px;margin:0 0 4px 0}
+    .score{font-size:28px;font-weight:700}
+    .small{font-size:13px;color:#9fb2d9}
+    button{
+      padding:8px 12px;border-radius:8px;border:0;background:#1f6feb;color:white;cursor:pointer;
+      box-shadow:0 6px 18px rgba(31,111,235,0.18);
+    }
+    footer.small{font-size:12px;color:#86a3d0;margin-top:6px}
+    .legend{display:flex;gap:8px;flex-wrap:wrap}
+    .color-dot{width:20px;height:20px;border-radius:5px}
+    .controls{display:flex;flex-direction:column;gap:8px;width:100%}
+    @media (max-width:880px){
+      body{padding:10px}
+      .container{flex-direction:column;width:auto}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div>
+      <div class="board" id="board" aria-label="Tabuleiro de blocos"></div>
+    </div>
+
+    <div class="panel">
+      <h1>Block Blast — Infinito</h1>
+      <div class="small">Clique em grupos de blocos da mesma cor para estourar!</div>
+
+      <div style="margin-top:12px">
+        <div class="small">Pontuação</div>
+        <div class="score" id="score">0</div>
+      </div>
+
+      <div class="controls" style="margin-top:10px">
+        <button id="restartBtn">Reiniciar</button>
+        <button id="shuffleBtn">Embaralhar</button>
+      </div>
+
+      <div style="margin-top:16px">
+        <div class="small">Cores no jogo</div>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <footer class="small">Modo infinito ativado 🔥</footer>
+    </div>
+  </div>
+
+  <script>
+    const COLS = 10;
+    const ROWS = 12;
+    const COLORS = ["#FF6B6B","#F7C948","#6BE68A","#6BCBFF","#C06CFF"];
+    const boardEl = document.getElementById('board');
+    const scoreEl = document.getElementById('score');
+    const legendEl = document.getElementById('legend');
+
+    let grid = [];
+    let score = 0;
+
+    function createLegend(){
+      legendEl.innerHTML = "";
+      COLORS.forEach((c,i)=>{
+        const d = document.createElement('div');
+        d.className = "color-dot";
+        d.style.background = c;
+        d.title = `Cor ${i+1}`;
+        legendEl.appendChild(d);
+      });
+    }
+
+    function initGrid(){
+      grid = [];
+      for(let r=0;r<ROWS;r++){
+        const row = [];
+        for(let c=0;c<COLS;c++){
+          row.push(randomColorIndex());
+        }
+        grid.push(row);
+      }
+    }
+
+    function randomColorIndex(){
+      return Math.floor(Math.random()*COLORS.length);
+    }
+
+    function render(){
+      boardEl.innerHTML = '';
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          const val = grid[r][c];
+          const div = document.createElement('div');
+          div.className = 'tile';
+          div.dataset.r = r;
+          div.dataset.c = c;
+          div.style.background = COLORS[val];
+          div.addEventListener('click', onTileClick);
+          boardEl.appendChild(div);
+        }
+      }
+      scoreEl.textContent = score;
+    }
+
+    function getNeighbors(r,c){
+      const n = [];
+      if(r>0) n.push([r-1,c]);
+      if(r<ROWS-1) n.push([r+1,c]);
+      if(c>0) n.push([r,c-1]);
+      if(c<COLS-1) n.push([r,c+1]);
+      return n;
+    }
+
+    function floodFill(r0,c0){
+      const color = grid[r0][c0];
+      const stack = [[r0,c0]];
+      const visited = new Set();
+      const result = [];
+      while(stack.length){
+        const [r,c] = stack.pop();
+        const key = r + ',' + c;
+        if(visited.has(key)) continue;
+        visited.add(key);
+        if(grid[r][c] !== color) continue;
+        result.push([r,c]);
+        getNeighbors(r,c).forEach(([nr,nc])=>{
+          if(!visited.has(nr+','+nc) && grid[nr][nc]===color){
+            stack.push([nr,nc]);
+          }
+        });
+      }
+      return result;
+    }
+
+    function onTileClick(){
+      const r = parseInt(this.dataset.r);
+      const c = parseInt(this.dataset.c);
+      const group = floodFill(r,c);
+      if(group.length < 2){
+        this.style.transform = 'scale(.95)';
+        setTimeout(()=> this.style.transform = '', 120);
+        return;
+      }
+      removeGroup(group);
+    }
+
+    function removeGroup(cells){
+      const tileElements = [];
+      cells.forEach(([r,c])=>{
+        const idx = r*COLS + c;
+        const el = boardEl.children[idx];
+        tileElements.push(el);
+        el.classList.add('removing');
+      });
+
+      score += cells.length * 10;
+
+      setTimeout(()=>{
+        cells.forEach(([r,c])=>{
+          grid[r][c] = null;
+        });
+        collapseGrid();  // MODO INFINITO
+        render();
+      }, 180);
+    }
+
+    function collapseGrid(){
+      for(let c=0;c<COLS;c++){
+        let write = ROWS-1;
+        for(let r=ROWS-1;r>=0;r--){
+          if(grid[r][c] !== null){
+            grid[write][c] = grid[r][c];
+            if(write !== r) grid[r][c] = null;
+            write--;
+          }
+        }
+        for(let r=write;r>=0;r--){
+          grid[r][c] = null;
+        }
+      }
+
+      // 🔥 MODO INFINITO: gera blocos novos no topo
+      for(let c=0;c<COLS;c++){
+        for(let r=0;r<ROWS;r++){
+          if(grid[r][c] === null){
+            grid[r][c] = randomColorIndex();
+          }
+        }
+      }
+    }
+
+    function shuffleRemaining(){
+      const values = [];
+      for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) values.push(grid[r][c]);
+      for(let i=values.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [values[i], values[j]] = [values[j], values[i]];
+      }
+      let p = 0;
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          grid[r][c] = values[p++];
+        }
+      }
+      render();
+    }
+
+    function restart(){
+      score = 0;
+      initGrid();
+      render();
+    }
+
+    document.getElementById('restartBtn').addEventListener('click', restart);
+    document.getElementById('shuffleBtn').addEventListener('click', shuffleRemaining);
+
+    createLegend();
+    initGrid();
+    render();
+  </script>
+</body>
+</html>
